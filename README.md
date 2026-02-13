@@ -10,6 +10,10 @@ This project implements the assignment **Real-Time AI Conversation (Image → 1-
 - Sends conversation turns to a small **Express backend** that calls an OpenAI-compatible model.
 - Demonstrates at least one **tool call** from the AI that changes the UI (e.g. background color or reward sticker).
 
+## Live demo
+
+Deployed app (Render): https://story-buddy-ai.onrender.com
+
 ## Getting started
 
 1. Install dependencies:
