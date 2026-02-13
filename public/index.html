@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Story Buddy - 1 Minute Conversation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="stylesheet" href="styles.css" />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect, useRef } = React;
+
+      const IMAGE_DESCRIPTION = 'a bright cartoon forest with a friendly dragon, a rainbow, and a little explorer child';
+
+      function useSpeech() {
+        const synthRef = useRef(window.speechSynthesis || null);
+        const recognitionRef = useRef(null);
+
+        useEffect(() => {
+          const SpeechRecognition =
+            window.SpeechRecognition || window.webkitSpeechRecognition || null;
+          if (SpeechRecognition) {
+            const rec = new SpeechRecognition();
+            rec.lang = 'en-US';
+            rec.interimResults = false;
+            rec.maxAlternatives = 1;
+            recognitionRef.current = rec;
+          }
+        }, []);
+
+        const speak = (text) => {
+          if (!synthRef.current || !text) return;
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 1;
+          utterance.pitch = 1.1;
+          synthRef.current.cancel();
+          synthRef.current.speak(utterance);
+        };
+
+        const listenOnce = () => {
+          return new Promise((resolve, reject) => {
+            const rec = recognitionRef.current;
+            if (!rec) {
+              resolve(null);
+              return;
+            }
+
+            let finished = false;
+
+            rec.onresult = (event) => {
+              const transcript = event.results[0][0].transcript;
+              finished = true;
+              rec.stop();
+              resolve(transcript);
+            };
+
+            rec.onerror = (event) => {
+              if (!finished) {
+                finished = true;
+                rec.stop();
+                resolve(null);
+              }
+            };
+
+            rec.onend = () => {
+              if (!finished) {
+                resolve(null);
+              }
+            };
+
+            try {
+              rec.start();
+            } catch (e) {
+              resolve(null);
+            }
+          });
+        };
+
+        return { speak, listenOnce };
+      }
+
+      function App() {
+        const [history, setHistory] = useState([]); // {from:'ai'|'child', text:string}
+        const [running, setRunning] = useState(false);
+        const [timeLeft, setTimeLeft] = useState(60);
+        const [status, setStatus] = useState('');
+        const [backgroundColor, setBackgroundColor] = useState('#020617');
+        const [sticker, setSticker] = useState(null);
+        const timerRef = useRef(null);
+        const stopRef = useRef(false);
+
+        const { speak, listenOnce } = useSpeech();
+
+        useEffect(() => {
+          if (!running) return;
+          const start = Date.now();
+          timerRef.current = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - start) / 1000);
+            const remaining = Math.max(0, 60 - elapsed);
+            setTimeLeft(remaining);
+            if (remaining <= 0) {
+              clearInterval(timerRef.current);
+              stopRef.current = true;
+              setRunning(false);
+              setStatus("Time's up! Great chatting 🎉");
+            }
+          }, 500);
+          return () => clearInterval(timerRef.current);
+        }, [running]);
+
+        const callBackend = async (updatedHistory) => {
+          try {
+            const apiHistory = updatedHistory.map((turn) => ({
+              role: turn.from === 'ai' ? 'assistant' : 'user',
+              content: turn.text
+            }));
+
+            const res = await fetch('/api/chat', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ history: apiHistory, imageDescription: IMAGE_DESCRIPTION })
+            });
+
+            if (!res.ok) {
+              throw new Error('API error');
+            }
+
+            const data = await res.json();
+            const aiText = data.content || "I'm having trouble speaking right now.";
+
+            const newTurn = { from: 'ai', text: aiText };
+            setHistory((h) => [...h, newTurn]);
+            speak(aiText);
+
+            if (data.toolCall && data.toolCall.name) {
+              handleToolCall(data.toolCall);
+            }
+
+            return aiText;
+          } catch (e) {
+            console.error(e);
+            setStatus('Could not reach AI. Check the server.');
+            return null;
+          }
+        };
+
+        const handleToolCall = (toolCall) => {
+          const { name, arguments: args } = toolCall;
+          if (name === 'changeBackgroundColor' && args?.color) {
+            setBackgroundColor(args.color);
+          } else if (name === 'showRewardSticker' && args?.sticker) {
+            setSticker(args.sticker);
+          }
+        };
+
+        const runTurnLoop = async () => {
+          while (!stopRef.current && timeLeft > 0) {
+            setStatus('Listening to you...');
+            const childSpeech = await listenOnce();
+            if (!childSpeech) {
+              setStatus('I could not hear you. Try speaking a bit louder.');
+            } else {
+              setHistory((h) => [...h, { from: 'child', text: childSpeech }]);
+            }
+
+            if (stopRef.current || timeLeft <= 0) break;
+
+            const latestHistory = (prev => prev)(history);
+            const merged = [...latestHistory, ...(childSpeech ? [{ from: 'child', text: childSpeech }] : [])];
+            setStatus('Thinking of the next part of the story...');
+            await callBackend(merged);
+          }
+        };
+
+        const startConversation = async () => {
+          stopRef.current = false;
+          setSticker(null);
+          setBackgroundColor('#020617');
+          setHistory([]);
+          setTimeLeft(60);
+          setRunning(true);
+          setStatus('Starting story...');
+
+          const firstTurn = await callBackend([]);
+          if (!firstTurn) {
+            setRunning(false);
+            return;
+          }
+
+          runTurnLoop();
+        };
+
+        const stopConversation = () => {
+          stopRef.current = true;
+          setRunning(false);
+          setStatus('Conversation stopped.');
+        };
+
+        return (
+          <div className="app" style={{ backgroundColor }}>
+            <div className="card">
+              <div className="image-wrapper">
+                <img src="https://images.pexels.com/photos/3662667/pexels-photo-3662667.jpeg?auto=compress&cs=tinysrgb&w=800" alt="Magical forest adventure" />
+                {sticker && (
+                  <div className="sticker">{sticker === 'star' ? '⭐' : '🎉'}</div>
+                )}
+              </div>
+              <div className="content">
+                <h1>Story Buddy</h1>
+                <p>
+                  Look at the picture and chat with your Story Buddy! It will
+                  talk with you about the scene for one minute.
+                </p>
+                <div className="controls">
+                  <button onClick={startConversation} disabled={running}>
+                    {running ? 'Talking...' : 'Start 1-Minute Chat'}
+                  </button>
+                  <button onClick={stopConversation} disabled={!running} className="secondary">
+                    Stop
+                  </button>
+                  <span className="timer">Time left: {timeLeft}s</span>
+                </div>
+                <div className="status">{status}</div>
+                <div className="transcript">
+                  {history.map((turn, idx) => (
+                    <div key={idx} className={turn.from === 'ai' ? 'line ai' : 'line child'}>
+                      <span className="who">{turn.from === 'ai' ? 'Story Buddy' : 'You'}:</span>
+                      <span>{turn.text}</span>
+                    </div>
+                  ))}
+                  {history.length === 0 && <div className="placeholder">Press start to begin the conversation.</div>}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,153 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #020617;
+  color: #e5e7eb;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.app {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  transition: background-color 0.6s ease;
+}
+
+.card {
+  background: radial-gradient(circle at top, #111827, #020617);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.9);
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr);
+  max-width: 1100px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.image-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.05);
+}
+
+.sticker {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 40px;
+}
+
+.content {
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+h1 {
+  font-size: 2rem;
+  color: #f9fafb;
+}
+
+p {
+  color: #cbd5f5;
+  line-height: 1.5;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+button {
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: linear-gradient(to right, #06b6d4, #6366f1);
+  color: white;
+  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.4);
+}
+
+button.secondary {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.8);
+  box-shadow: none;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.timer {
+  font-size: 0.9rem;
+  color: #a5b4fc;
+  margin-left: auto;
+}
+
+.status {
+  min-height: 20px;
+  font-size: 0.9rem;
+  color: #fef3c7;
+}
+
+.transcript {
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 16px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 0.9rem;
+}
+
+.line {
+  display: flex;
+  gap: 6px;
+}
+
+.line.ai .who {
+  color: #38bdf8;
+}
+
+.line.child .who {
+  color: #f97316;
+}
+
+.placeholder {
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .image-wrapper {
+    max-height: 260px;
+  }
+}
