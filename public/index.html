@@ -97,6 +97,12 @@
 
         const { speak, listenOnce } = useSpeech();
 
+        // Use the Render backend when running on GitHub Pages; otherwise
+        // default to same-origin (useful for local development).
+        const API_BASE = window.location.hostname.includes('github.io')
+          ? 'https://story-buddy-ai.onrender.com'
+          : '';
+
         useEffect(() => {
           if (!running) return;
           const start = Date.now();
@@ -122,7 +128,7 @@
               content: turn.text
             }));
 
-            const res = await fetch('/api/chat', {
+            const res = await fetch(`${API_BASE}/api/chat`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ history: apiHistory, imageDescription: IMAGE_DESCRIPTION })
