@@ -34,12 +34,22 @@
         }, []);
 
         const speak = (text) => {
-          if (!synthRef.current || !text) return;
-          const utterance = new SpeechSynthesisUtterance(text);
-          utterance.rate = 1;
-          utterance.pitch = 1.1;
-          synthRef.current.cancel();
-          synthRef.current.speak(utterance);
+          return new Promise((resolve) => {
+            if (!synthRef.current || !text) {
+              resolve();
+              return;
+            }
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1;
+            utterance.pitch = 1.1;
+
+            utterance.onend = () => resolve();
+            utterance.onerror = () => resolve();
+
+            synthRef.current.cancel();
+            synthRef.current.speak(utterance);
+          });
         };
 
         const listenOnce = () => {
@@ -143,7 +153,7 @@
 
             const newTurn = { from: 'ai', text: aiText };
             setHistory((h) => [...h, newTurn]);
-            speak(aiText);
+            await speak(aiText);
 
             if (data.toolCall && data.toolCall.name) {
               handleToolCall(data.toolCall);
@@ -174,6 +184,8 @@
             const childSpeech = await listenOnce();
             if (!childSpeech) {
               setStatus('I could not hear you. Stopping the chat for now.');
+              stopRef.current = true;
+              setRunning(false);
               break;
             } else {
               localHistory.push({ from: 'child', text: childSpeech });
