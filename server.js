@@ -80,7 +80,9 @@ app.post('/api/chat', async (req, res) => {
 
     if (!openai) {
       // Fallback: simple local storyteller logic when no API key is set.
-      const lastUser = (Array.isArray(history) ? history : []).filter(m => m.role === 'user').slice(-1)[0];
+      const safeHistory = Array.isArray(history) ? history : [];
+      const lastUser = safeHistory.filter(m => m.role === 'user').slice(-1)[0];
+      const lastAssistant = safeHistory.filter(m => m.role === 'assistant').slice(-1)[0];
       const childSaid = lastUser?.content || '';
 
       const cannedOpeners = [
@@ -89,19 +91,43 @@ app.post('/api/chat', async (req, res) => {
         'It looks like everyone is having a great time. What would you like to play with here?'
       ];
 
-      if (!history || history.length === 0) {
+      const followUps = [
+        'I like that idea! What else could happen next in this picture?',
+        'That sounds fun! Can you tell me one more thing you notice in the picture?',
+        'Cool! If you were there, what would you do next?',
+        'Nice thinking. Can you imagine a little story that happens here?'
+      ];
+
+      if (!history || history.length === 0 || !lastAssistant) {
         contentText = cannedOpeners[Math.floor(Math.random() * cannedOpeners.length)];
+      } else if (!childSaid) {
+        contentText = 'I am listening. Can you tell me one thing you notice in the picture?';
       } else {
-        contentText = childSaid
-          ? `I like that idea! What else could happen next in this picture?`
-          : `I am listening. Can you tell me one thing you notice in the picture?`;
+        // Pick a follow-up that is not identical to the last assistant line, for variety.
+        let candidate = followUps[Math.floor(Math.random() * followUps.length)];
+        if (lastAssistant && lastAssistant.content === candidate) {
+          candidate = followUps[(followUps.indexOf(candidate) + 1) % followUps.length];
+        }
+        contentText = candidate;
       }
 
       // Occasionally trigger a simple UI tool call for the demo.
-      if (Math.random() < 0.4) {
+      const uiChance = Math.random();
+      if (uiChance < 0.25) {
+        // Change background to one of a few playful colors.
+        const colors = ['#0f172a', '#1e293b', '#022c22', '#312e81'];
+        const color = colors[Math.floor(Math.random() * colors.length)];
         toolCall = {
           name: 'changeBackgroundColor',
-          arguments: { color: '#0f172a' }
+          arguments: { color }
+        };
+      } else if (uiChance < 0.35) {
+        // Occasionally show a reward sticker.
+        const stickers = ['star', 'trophy', 'unicorn'];
+        const sticker = stickers[Math.floor(Math.random() * stickers.length)];
+        toolCall = {
+          name: 'showRewardSticker',
+          arguments: { sticker }
         };
       }
     } else {
