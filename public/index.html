@@ -93,6 +93,7 @@
         const [sticker, setSticker] = useState(null);
         const timerRef = useRef(null);
         const stopRef = useRef(false);
+        const timeLeftRef = useRef(60);
 
         const { speak, listenOnce } = useSpeech();
 
@@ -102,6 +103,7 @@
           timerRef.current = setInterval(() => {
             const elapsed = Math.floor((Date.now() - start) / 1000);
             const remaining = Math.max(0, 60 - elapsed);
+            timeLeftRef.current = remaining;
             setTimeLeft(remaining);
             if (remaining <= 0) {
               clearInterval(timerRef.current);
@@ -159,21 +161,28 @@
         };
 
         const runTurnLoop = async () => {
-          while (!stopRef.current && timeLeft > 0) {
+          let localHistory = [...history];
+
+          while (!stopRef.current && timeLeftRef.current > 0) {
             setStatus('Listening to you...');
             const childSpeech = await listenOnce();
             if (!childSpeech) {
-              setStatus('I could not hear you. Try speaking a bit louder.');
+              setStatus('I could not hear you. Stopping the chat for now.');
+              break;
             } else {
-              setHistory((h) => [...h, { from: 'child', text: childSpeech }]);
+              localHistory.push({ from: 'child', text: childSpeech });
+              setHistory([...localHistory]);
             }
 
-            if (stopRef.current || timeLeft <= 0) break;
+            if (stopRef.current || timeLeftRef.current <= 0) break;
 
-            const latestHistory = (prev => prev)(history);
-            const merged = [...latestHistory, ...(childSpeech ? [{ from: 'child', text: childSpeech }] : [])];
             setStatus('Thinking of the next part of the story...');
-            await callBackend(merged);
+            const aiText = await callBackend(localHistory);
+            if (!aiText) break;
+
+            // callBackend already appends the AI turn via setHistory, but
+            // we also keep localHistory in sync for subsequent turns.
+            localHistory.push({ from: 'ai', text: aiText });
           }
         };
 
